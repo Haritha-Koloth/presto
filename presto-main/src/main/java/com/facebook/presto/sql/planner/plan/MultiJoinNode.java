@@ -131,7 +131,7 @@ public class MultiJoinNode
                 '}';
     }
 
-    static MultiJoinNode toMultiJoinNode(JoinNode joinNode, Lookup lookup, int joinLimit, boolean handleComplexEquiJoins, FunctionResolution functionResolution, DeterminismEvaluator determinismEvaluator)
+    public static MultiJoinNode toMultiJoinNode(JoinNode joinNode, Lookup lookup, int joinLimit, boolean handleComplexEquiJoins, FunctionResolution functionResolution, DeterminismEvaluator determinismEvaluator)
     {
         // the number of sources is the number of joins + 1
         return new MultiJoinNode.JoinNodeFlattener(joinNode, lookup, joinLimit + 1, handleComplexEquiJoins, functionResolution, determinismEvaluator).toMultiJoinNode();
@@ -275,7 +275,7 @@ public class MultiJoinNode
         }
     }
 
-    static class Builder
+    public static class Builder
     {
         private List<PlanNode> sources;
         private RowExpression filter;

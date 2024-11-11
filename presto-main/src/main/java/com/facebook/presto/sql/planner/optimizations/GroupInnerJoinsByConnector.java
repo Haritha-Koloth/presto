@@ -46,6 +46,7 @@ import com.facebook.presto.sql.planner.NullabilityAnalyzer;
 import com.facebook.presto.sql.planner.TypeProvider;
 import com.facebook.presto.sql.planner.plan.AssignmentUtils;
 import com.facebook.presto.sql.planner.plan.JoinNode;
+import com.facebook.presto.sql.planner.plan.MultiJoinNode;
 import com.facebook.presto.sql.planner.plan.SimplePlanRewriter;
 import com.facebook.presto.sql.relational.FunctionResolution;
 import com.facebook.presto.sql.relational.RowExpressionDeterminismEvaluator;
