@@ -53,8 +53,8 @@ import static java.util.Objects.requireNonNull;
 public class MultiJoinNode
 {
     // Use a linked hash set to ensure optimizer is deterministic
-    private final CanonicalJoinNode node;
-    private final Assignments assignments;
+    protected CanonicalJoinNode node;
+    protected Assignments assignments;
 
     public MultiJoinNode(LinkedHashSet<PlanNode> sources, RowExpression filter, List<VariableReferenceExpression> outputVariables,
             Assignments assignments)
@@ -137,7 +137,7 @@ public class MultiJoinNode
         return new MultiJoinNode.JoinNodeFlattener(joinNode, lookup, joinLimit + 1, handleComplexEquiJoins, functionResolution, determinismEvaluator).toMultiJoinNode();
     }
 
-    private static class JoinNodeFlattener
+    public static class JoinNodeFlattener
     {
         private final LinkedHashSet<PlanNode> sources = new LinkedHashSet<>();
         private final Assignments intermediateAssignments;
@@ -148,7 +148,7 @@ public class MultiJoinNode
         private final DeterminismEvaluator determinismEvaluator;
         private final Lookup lookup;
 
-        JoinNodeFlattener(JoinNode node, Lookup lookup, int sourceLimit, boolean handleComplexEquiJoins, FunctionResolution functionResolution,
+        public JoinNodeFlattener(JoinNode node, Lookup lookup, int sourceLimit, boolean handleComplexEquiJoins, FunctionResolution functionResolution,
                 DeterminismEvaluator determinismEvaluator)
         {
             requireNonNull(node, "node is null");
