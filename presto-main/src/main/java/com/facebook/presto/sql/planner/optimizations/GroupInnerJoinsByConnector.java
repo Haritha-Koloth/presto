@@ -614,10 +614,10 @@ public class GroupInnerJoinsByConnector
             private void flattenNode(PlanNode resolved)
             {
                 if (resolved instanceof FilterNode) {
-            /*
-                We pull up all Filters to the top of the join graph, these will be pushed down again by predicate pushdown
-                We do this in hope of surfacing any TableScan nodes that can be combined
-            */
+                /*
+                    We pull up all Filters to the top of the join graph, these will be pushed down again by predicate pushdown
+                    We do this in hope of surfacing any TableScan nodes that can be combined
+                */
                     FilterNode filterNode = (FilterNode) resolved;
                     filters.add(filterNode.getPredicate());
                     flattenNode(filterNode.getSource());
@@ -626,11 +626,11 @@ public class GroupInnerJoinsByConnector
 
                 if (!(resolved instanceof JoinNode)) {
                     if (resolved instanceof ProjectNode) {
-                /*
-                    Certain ProjectNodes can be 'inlined' into the parent TableScan, e.g a CAST expression
-                    We will do this here while flattening the JoinNode if possible
-                    For now, we log the fact that we saw a ProjectNode and if identity projection, will continue
-                */
+                        /*
+                            Certain ProjectNodes can be 'inlined' into the parent TableScan, e.g a CAST expression
+                            We will do this here while flattening the JoinNode if possible
+                            For now, we log the fact that we saw a ProjectNode and if identity projection, will continue
+                        */
                         //Only identity projections can be handled.
                         if (AssignmentUtils.isIdentity(((ProjectNode) resolved).getAssignments())) {
                             flattenNode(((ProjectNode) resolved).getSource());
@@ -657,11 +657,9 @@ public class GroupInnerJoinsByConnector
             GroupInnerJoinsMultiJoinNode toMultiJoinNode()
             {
                 ImmutableSet<VariableReferenceExpression> inputVariables = sources.stream().flatMap(source -> source.getOutputVariables().stream()).collect(toImmutableSet());
-
-        /*
-            We do this to satisfy the invariant that the rewritten Join node must produce the same output variables as the input Join node
-        */
-
+                /*
+                    We do this to satisfy the invariant that the rewritten Join node must produce the same output variables as the input Join node
+                */
                 ImmutableSet.Builder<VariableReferenceExpression> updatedOutputVariables = ImmutableSet.builder();
 
                 for (VariableReferenceExpression outputVariable : outputVariables) {
