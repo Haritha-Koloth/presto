@@ -88,7 +88,6 @@ import static com.facebook.presto.sql.planner.iterative.rule.ReorderJoins.JoinEn
 import static com.facebook.presto.sql.planner.optimizations.JoinNodeUtils.toRowExpression;
 import static com.facebook.presto.sql.planner.optimizations.QueryCardinalityUtil.isAtMostScalar;
 import static com.facebook.presto.sql.planner.plan.AssignmentUtils.getNonIdentityAssignments;
-import static com.facebook.presto.sql.planner.plan.MultiJoinNode.toMultiJoinNode;
 import static com.facebook.presto.sql.planner.plan.Patterns.join;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -156,7 +155,7 @@ public class ReorderJoins
     @Override
     public Result apply(JoinNode joinNode, Captures captures, Context context)
     {
-        ReorderJoinsMultiJoinNode multiJoinNode = (ReorderJoinsMultiJoinNode) toMultiJoinNode(joinNode, context.getLookup(), getMaxReorderedJoins(context.getSession()), shouldHandleComplexEquiJoins(context.getSession()),
+        ReorderJoinsMultiJoinNode multiJoinNode = ReorderJoinsMultiJoinNode.toMultiJoinNode(joinNode, context.getLookup(), getMaxReorderedJoins(context.getSession()), shouldHandleComplexEquiJoins(context.getSession()),
                 functionResolution, determinismEvaluator);
         JoinEnumerator joinEnumerator = new JoinEnumerator(
                 costComparator,
@@ -608,6 +607,12 @@ public class ReorderJoins
             super(sources, filter, outputVariables, assignments);
         }
 
+        public static ReorderJoinsMultiJoinNode toMultiJoinNode(JoinNode joinNode, Lookup lookup, int joinLimit, boolean handleComplexEquiJoins, FunctionResolution functionResolution, DeterminismEvaluator determinismEvaluator)
+        {
+            // the number of sources is the number of joins + 1
+            return new ReorderJoinsMultiJoinNode.JoinNodeFlattener(joinNode, lookup, joinLimit + 1, handleComplexEquiJoins, functionResolution, determinismEvaluator).toMultiJoinNode();
+        }
+
         private static class JoinNodeFlattener
         {
             private final LinkedHashSet<PlanNode> sources = new LinkedHashSet<>();
@@ -712,7 +717,7 @@ public class ReorderJoins
                 joinNode.getFilter().ifPresent(filters::add);
             }
 
-            MultiJoinNode toMultiJoinNode()
+            ReorderJoinsMultiJoinNode toMultiJoinNode()
             {
                 ImmutableSet<VariableReferenceExpression> inputVariables = sources.stream().flatMap(source -> source.getOutputVariables().stream()).collect(toImmutableSet());
 
@@ -739,7 +744,7 @@ public class ReorderJoins
                     updatedOutputVariables.addAll(extractUnique(intermediateAssignments.get(outputVariable)));
                 }
 
-                return new MultiJoinNode(sources,
+                return new ReorderJoinsMultiJoinNode(sources,
                         and(filters),
                         updatedOutputVariables.build().asList(),
                         nonIdentityAssignmentsFound ? overallAssignments.build() : Assignments.of());

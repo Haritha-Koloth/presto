@@ -50,7 +50,7 @@ import static com.facebook.presto.spi.plan.JoinType.INNER;
 import static com.facebook.presto.spi.plan.JoinType.LEFT;
 import static com.facebook.presto.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static com.facebook.presto.sql.planner.iterative.Lookup.noLookup;
-import static com.facebook.presto.sql.planner.plan.MultiJoinNode.toMultiJoinNode;
+import static com.facebook.presto.sql.planner.iterative.rule.ReorderJoins.ReorderJoinsMultiJoinNode.toMultiJoinNode;
 import static com.facebook.presto.sql.relational.Expressions.call;
 import static com.facebook.presto.sql.relational.Expressions.constant;
 import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
