@@ -610,7 +610,7 @@ public class ReorderJoins
         public static ReorderJoinsMultiJoinNode toMultiJoinNode(JoinNode joinNode, Lookup lookup, int joinLimit, boolean handleComplexEquiJoins, FunctionResolution functionResolution, DeterminismEvaluator determinismEvaluator)
         {
             // the number of sources is the number of joins + 1
-            return new ReorderJoinsMultiJoinNode.JoinNodeFlattener(joinNode, lookup, joinLimit + 1, handleComplexEquiJoins, functionResolution, determinismEvaluator).toMultiJoinNode();
+            return new JoinNodeFlattener(joinNode, lookup, joinLimit + 1, handleComplexEquiJoins, functionResolution, determinismEvaluator).toMultiJoinNode();
         }
 
         private static class JoinNodeFlattener

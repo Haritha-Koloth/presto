@@ -572,11 +572,6 @@ public class GroupInnerJoinsByConnector
         public GroupInnerJoinsMultiJoinNode(LinkedHashSet<PlanNode> sources, RowExpression filter, List<VariableReferenceExpression> outputVariables, Assignments assignments, boolean containsCombinedSources, RowExpression joinFilter)
         {
             super(sources, filter, outputVariables, assignments);
-            requireNonNull(sources, "sources is null");
-            requireNonNull(filter, "filter is null");
-            requireNonNull(outputVariables, "outputVariables is null");
-            requireNonNull(assignments, "assignments is null");
-
             this.containsCombinedSources = containsCombinedSources;
             this.joinFilter = joinFilter;
         }
