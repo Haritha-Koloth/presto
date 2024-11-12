@@ -28,7 +28,6 @@ import java.util.Objects;
 
 import static com.facebook.presto.expressions.LogicalRowExpressions.extractConjuncts;
 import static com.facebook.presto.spi.plan.JoinType.INNER;
-import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Objects.requireNonNull;
 
@@ -41,8 +40,6 @@ public class MultiJoinNode
     public MultiJoinNode(LinkedHashSet<PlanNode> sources, RowExpression filter, List<VariableReferenceExpression> outputVariables,
             Assignments assignments)
     {
-        checkArgument(sources.size() > 1, "sources size is <= 1");
-
         requireNonNull(sources, "sources is null");
         requireNonNull(filter, "filter is null");
         requireNonNull(outputVariables, "outputVariables is null");

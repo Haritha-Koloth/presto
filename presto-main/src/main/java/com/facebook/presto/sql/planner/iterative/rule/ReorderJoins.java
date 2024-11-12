@@ -605,6 +605,7 @@ public class ReorderJoins
         public ReorderJoinsMultiJoinNode(LinkedHashSet<PlanNode> sources, RowExpression filter, List<VariableReferenceExpression> outputVariables, Assignments assignments)
         {
             super(sources, filter, outputVariables, assignments);
+            checkArgument(sources.size() > 1, "sources size is <= 1");
         }
 
         public static ReorderJoinsMultiJoinNode toMultiJoinNode(JoinNode joinNode, Lookup lookup, int joinLimit, boolean handleComplexEquiJoins, FunctionResolution functionResolution, DeterminismEvaluator determinismEvaluator)
