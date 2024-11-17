@@ -155,7 +155,7 @@ public class ReorderJoins
     @Override
     public Result apply(JoinNode joinNode, Captures captures, Context context)
     {
-        ReorderJoinsMultiJoinNode multiJoinNode = ReorderJoinsMultiJoinNode.toMultiJoinNode(joinNode, context.getLookup(), getMaxReorderedJoins(context.getSession()), shouldHandleComplexEquiJoins(context.getSession()),
+        MultiJoinNode multiJoinNode = toMultiJoinNode(joinNode, context.getLookup(), getMaxReorderedJoins(context.getSession()), shouldHandleComplexEquiJoins(context.getSession()),
                 functionResolution, determinismEvaluator);
         JoinEnumerator joinEnumerator = new JoinEnumerator(
                 costComparator,
@@ -595,9 +595,12 @@ public class ReorderJoins
         }
     }
 
-    /**
-     * This class represents a set of inner joins that can be executed in any order.
-     */
+    public static MultiJoinNode toMultiJoinNode(JoinNode joinNode, Lookup lookup, int joinLimit, boolean handleComplexEquiJoins, FunctionResolution functionResolution, DeterminismEvaluator determinismEvaluator)
+    {
+        // the number of sources is the number of joins + 1
+        return new ReorderJoinsMultiJoinNode.JoinNodeFlattener(joinNode, lookup, joinLimit + 1, handleComplexEquiJoins, functionResolution, determinismEvaluator).toMultiJoinNode();
+    }
+
     @VisibleForTesting
     static class ReorderJoinsMultiJoinNode
             extends MultiJoinNode
@@ -606,12 +609,6 @@ public class ReorderJoins
         {
             super(sources, filter, outputVariables, assignments);
             checkArgument(sources.size() > 1, "sources size is <= 1");
-        }
-
-        public static ReorderJoinsMultiJoinNode toMultiJoinNode(JoinNode joinNode, Lookup lookup, int joinLimit, boolean handleComplexEquiJoins, FunctionResolution functionResolution, DeterminismEvaluator determinismEvaluator)
-        {
-            // the number of sources is the number of joins + 1
-            return new JoinNodeFlattener(joinNode, lookup, joinLimit + 1, handleComplexEquiJoins, functionResolution, determinismEvaluator).toMultiJoinNode();
         }
 
         private static class JoinNodeFlattener

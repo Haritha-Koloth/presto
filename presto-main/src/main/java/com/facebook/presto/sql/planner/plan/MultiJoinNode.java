@@ -31,6 +31,9 @@ import static com.facebook.presto.spi.plan.JoinType.INNER;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Objects.requireNonNull;
 
+/**
+ * This class represents a set of inner joins that can be executed in any order.
+ */
 public class MultiJoinNode
 {
     // Use a linked hash set to ensure optimizer is deterministic

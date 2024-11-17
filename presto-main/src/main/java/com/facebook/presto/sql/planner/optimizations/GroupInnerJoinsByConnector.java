@@ -48,6 +48,7 @@ import com.facebook.presto.sql.planner.plan.MultiJoinNode;
 import com.facebook.presto.sql.planner.plan.SimplePlanRewriter;
 import com.facebook.presto.sql.relational.FunctionResolution;
 import com.facebook.presto.sql.relational.RowExpressionDeterminismEvaluator;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -563,6 +564,7 @@ public class GroupInnerJoinsByConnector
         }
     }
 
+    @VisibleForTesting
     static class GroupInnerJoinsMultiJoinNode
             extends MultiJoinNode
     {
