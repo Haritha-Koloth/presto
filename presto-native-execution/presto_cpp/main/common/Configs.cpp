@@ -139,6 +139,8 @@ SystemConfig::SystemConfig() {
           BOOL_PROP(kHttpServerBindToNodeInternalAddressOnlyEnabled, false),
           NONE_PROP(kDiscoveryUri),
           NUM_PROP(kMaxDriversPerTask, 16),
+          NONE_PROP(kTaskWriterCount),
+          NONE_PROP(kTaskPartitionedWriterCount),
           NUM_PROP(kConcurrentLifespansPerTask, 1),
           STR_PROP(kTaskMaxPartialAggregationMemory, "16MB"),
           NUM_PROP(kHttpServerNumIoThreadsHwMultiplier, 1.0),
@@ -176,6 +178,7 @@ SystemConfig::SystemConfig() {
           BOOL_PROP(kNativeSidecar, false),
           BOOL_PROP(kAsyncDataCacheEnabled, true),
           NUM_PROP(kAsyncCacheSsdGb, 0),
+          BOOL_PROP(kQueryDataCacheEnabledDefault, true),
           NUM_PROP(kAsyncCacheSsdCheckpointGb, 0),
           STR_PROP(kAsyncCacheSsdPath, "/mnt/flash/async_cache."),
           NUM_PROP(kAsyncCacheMaxSsdWriteRatio, 0.7),
@@ -192,7 +195,7 @@ SystemConfig::SystemConfig() {
           STR_PROP(kSharedArbitratorReservedCapacity, "4GB"),
           STR_PROP(kSharedArbitratorMemoryPoolInitialCapacity, "128MB"),
           STR_PROP(kSharedArbitratorMemoryPoolReservedCapacity, "64MB"),
-          STR_PROP(kSharedArbitratorMemoryReclaimMaxWaitTime, "5m"),
+          STR_PROP(kSharedArbitratorMaxMemoryArbitrationTime, "5m"),
           STR_PROP(kSharedArbitratorGlobalArbitrationEnabled, "false"),
           NUM_PROP(kLargestSizeClassPages, 256),
           BOOL_PROP(kEnableVeloxTaskLogging, false),
@@ -341,6 +344,14 @@ int32_t SystemConfig::maxDriversPerTask() const {
   return optionalProperty<int32_t>(kMaxDriversPerTask).value();
 }
 
+folly::Optional<int32_t> SystemConfig::taskWriterCount() const {
+  return optionalProperty<int32_t>(kTaskWriterCount);
+}
+
+folly::Optional<int32_t> SystemConfig::taskPartitionedWriterCount() const {
+  return optionalProperty<int32_t>(kTaskPartitionedWriterCount);
+}
+
 int32_t SystemConfig::concurrentLifespansPerTask() const {
   return optionalProperty<int32_t>(kConcurrentLifespansPerTask).value();
 }
@@ -454,6 +465,10 @@ bool SystemConfig::asyncDataCacheEnabled() const {
   return optionalProperty<bool>(kAsyncDataCacheEnabled).value();
 }
 
+bool SystemConfig::queryDataCacheEnabledDefault() const {
+  return optionalProperty<bool>(kQueryDataCacheEnabledDefault).value();
+}
+
 uint64_t SystemConfig::asyncCacheSsdCheckpointGb() const {
   return optionalProperty<uint64_t>(kAsyncCacheSsdCheckpointGb).value();
 }
@@ -552,12 +567,12 @@ std::string SystemConfig::sharedArbitratorMemoryPoolReservedCapacity() const {
           std::string(kSharedArbitratorMemoryPoolReservedCapacityDefault));
 }
 
-std::string SystemConfig::sharedArbitratorMemoryReclaimWaitTime() const {
+std::string SystemConfig::sharedArbitratorMaxMemoryArbitrationTime() const {
   static constexpr std::string_view
-      kSharedArbitratorMemoryReclaimMaxWaitTimeDefault = "5m";
+      kSharedArbitratorMaxMemoryArbitrationTimeDefault = "5m";
   return optionalProperty<std::string>(
-             kSharedArbitratorMemoryReclaimMaxWaitTime)
-      .value_or(std::string(kSharedArbitratorMemoryReclaimMaxWaitTimeDefault));
+             kSharedArbitratorMaxMemoryArbitrationTime)
+      .value_or(std::string(kSharedArbitratorMaxMemoryArbitrationTimeDefault));
 }
 
 std::string SystemConfig::sharedArbitratorFastExponentialGrowthCapacityLimit()
@@ -876,7 +891,7 @@ void BaseVeloxQueryConfig::updateLoadedValues(
   auto systemConfig = SystemConfig::instance();
 
   using namespace velox::core;
-  const std::unordered_map<std::string, std::string> updatedValues{
+  std::unordered_map<std::string, std::string> updatedValues{
       {QueryConfig::kPrestoArrayAggIgnoreNulls,
        bool2String(systemConfig->useLegacyArrayAgg())},
       {QueryConfig::kMaxOutputBufferSize,
@@ -889,6 +904,17 @@ void BaseVeloxQueryConfig::updateLoadedValues(
        systemConfig->capacityPropertyAsBytesString(
            SystemConfig::kTaskMaxPartialAggregationMemory)},
   };
+
+  auto taskWriterCount = systemConfig->taskWriterCount();
+  if (taskWriterCount.has_value()) {
+    updatedValues[QueryConfig::kTaskWriterCount] =
+        std::to_string(taskWriterCount.value());
+  }
+  auto taskPartitionedWriterCount = systemConfig->taskPartitionedWriterCount();
+  if (taskPartitionedWriterCount.has_value()) {
+    updatedValues[QueryConfig::kTaskPartitionedWriterCount] =
+        std::to_string(taskPartitionedWriterCount.value());
+  }
 
   std::stringstream updated;
   for (const auto& pair : updatedValues) {

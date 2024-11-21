@@ -241,6 +241,15 @@ Native Execution only. Enable window spilling on native engine.
 
 Native Execution only. Enable writer spilling on native engine.
 
+``native_writer_flush_threshold_bytes``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* **Type:** ``bigint``
+* **Default value:** ``100663296``
+
+Minimum memory footprint size required to reclaim memory from a file writer by flushing its buffered data to disk.
+Default is 96MB.
+
 ``native_max_output_buffer_size``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -258,3 +267,41 @@ The maximum size in bytes for the task's buffered output. The buffer is shared a
 The maximum bytes to buffer per PartitionedOutput operator to avoid creating tiny SerializedPages.
 For PartitionedOutputNode::Kind::kPartitioned, PartitionedOutput operator would buffer up to that number of
 bytes / number of destinations for each destination before producing a SerializedPage. Default is 32MB.
+
+``native_max_local_exchange_partition_count``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* **Type:** ``bigint``
+* **Default value:** ``4294967296``
+
+Maximum number of partitions created by a local exchange.
+Affects concurrency for pipelines containing LocalPartitionNode.
+
+
+``native_spill_prefixsort_enabled``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* **Type:** ``boolean``
+* **Default value:** ``false``
+
+Enable the prefix sort or fallback to std::sort in spill. The prefix sort is
+faster than std::sort but requires the memory to build normalized prefix
+keys, which might have potential risk of running out of server memory.
+
+``native_prefixsort_normalized_key_max_bytes``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* **Type:** ``integer``
+* **Default value:** ``128``
+
+Maximum number of bytes to use for the normalized key in prefix-sort.
+Use ``0`` to disable prefix-sort.
+
+``native_prefixsort_min_rows``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* **Type:** ``integer``
+* **Default value:** ``130``
+
+Minimum number of rows to use prefix-sort.
+The default value has been derived using micro-benchmarking.

@@ -41,6 +41,7 @@ public class NativeWorkerSessionPropertyProvider
     public static final String NATIVE_JOIN_SPILL_ENABLED = "native_join_spill_enabled";
     public static final String NATIVE_WINDOW_SPILL_ENABLED = "native_window_spill_enabled";
     public static final String NATIVE_WRITER_SPILL_ENABLED = "native_writer_spill_enabled";
+    public static final String NATIVE_WRITER_FLUSH_THRESHOLD_BYTES = "native_writer_flush_threshold_bytes";
     public static final String NATIVE_ROW_NUMBER_SPILL_ENABLED = "native_row_number_spill_enabled";
     public static final String NATIVE_TOPN_ROW_NUMBER_SPILL_ENABLED = "native_topn_row_number_spill_enabled";
     public static final String NATIVE_SPILLER_NUM_PARTITION_BITS = "native_spiller_num_partition_bits";
@@ -60,6 +61,10 @@ public class NativeWorkerSessionPropertyProvider
     public static final String NATIVE_QUERY_TRACE_NODE_IDS = "native_query_trace_node_ids";
     public static final String NATIVE_QUERY_TRACE_MAX_BYTES = "native_query_trace_max_bytes";
     public static final String NATIVE_QUERY_TRACE_REG_EXP = "native_query_trace_task_reg_exp";
+    public static final String NATIVE_MAX_LOCAL_EXCHANGE_PARTITION_COUNT = "native_max_local_exchange_partition_count";
+    public static final String NATIVE_SPILL_PREFIXSORT_ENABLED = "native_spill_prefixsort_enabled";
+    public static final String NATIVE_PREFIXSORT_NORMALIZED_KEY_MAX_BYTES = "native_prefixsort_normalized_key_max_bytes";
+    public static final String NATIVE_PREFIXSORT_MIN_ROWS = "native_prefixsort_min_rows";
     private final List<PropertyMetadata<?>> sessionProperties;
 
     @Inject
@@ -122,6 +127,12 @@ public class NativeWorkerSessionPropertyProvider
                         "Native Execution only. Enable writer spilling on native engine",
                         false,
                         !nativeExecution),
+                longProperty(
+                        NATIVE_WRITER_FLUSH_THRESHOLD_BYTES,
+                        "Native Execution only. Minimum memory footprint size required to reclaim memory from a file " +
+                        "writer by flushing its buffered data to disk.",
+                        96L << 20,
+                        false),
                 booleanProperty(
                         NATIVE_ROW_NUMBER_SPILL_ENABLED,
                         "Native Execution only. Enable row number spilling on native engine",
@@ -225,6 +236,31 @@ public class NativeWorkerSessionPropertyProvider
                                 "would buffer up to that number of bytes / number of destinations for each destination before " +
                                 "producing a SerializedPage.",
                         24L << 20,
+                        !nativeExecution),
+                integerProperty(
+                        NATIVE_MAX_LOCAL_EXCHANGE_PARTITION_COUNT,
+                        "Maximum number of partitions created by a local exchange. " +
+                                "Affects concurrency for pipelines containing LocalPartitionNode",
+                        null,
+                        !nativeExecution),
+                booleanProperty(
+                        NATIVE_SPILL_PREFIXSORT_ENABLED,
+                        "Enable the prefix sort or fallback to std::sort in spill. " +
+                                "The prefix sort is faster than std::sort but requires the memory to build normalized " +
+                                "prefix keys, which might have potential risk of running out of server memory.",
+                        false,
+                        !nativeExecution),
+                integerProperty(
+                        NATIVE_PREFIXSORT_NORMALIZED_KEY_MAX_BYTES,
+                        "Maximum number of bytes to use for the normalized key in prefix-sort. " +
+                                "Use 0 to disable prefix-sort.",
+                        128,
+                        !nativeExecution),
+                integerProperty(
+                        NATIVE_PREFIXSORT_MIN_ROWS,
+                        "Minimum number of rows to use prefix-sort. " +
+                                "The default value (130) has been derived using micro-benchmarking.",
+                        130,
                         !nativeExecution));
     }
 

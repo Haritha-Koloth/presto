@@ -179,6 +179,9 @@ class SystemConfig : public ConfigBase {
   static constexpr std::string_view kDiscoveryUri{"discovery.uri"};
   static constexpr std::string_view kMaxDriversPerTask{
       "task.max-drivers-per-task"};
+  static constexpr std::string_view kTaskWriterCount{"task.writer-count"};
+  static constexpr std::string_view kTaskPartitionedWriterCount{
+      "task.partitioned-writer-count"};
   static constexpr std::string_view kConcurrentLifespansPerTask{
       "task.concurrent-lifespans-per-task"};
   static constexpr std::string_view kTaskMaxPartialAggregationMemory{
@@ -310,6 +313,12 @@ class SystemConfig : public ConfigBase {
 
   static constexpr std::string_view kAsyncDataCacheEnabled{
       "async-data-cache-enabled"};
+  /// If true, SSD cache is enabled by default and is disabled only if
+  /// `node_selection_strategy` is present and set to `NO_PREFERENCE`.
+  /// Otherwise, SSD cache is disabled by default and is enabled if
+  /// `node_selection_strategy` is present and set to `SOFT_AFFINITY`.
+  static constexpr std::string_view kQueryDataCacheEnabledDefault{
+      "query-data-cache-enabled-default"};
   static constexpr std::string_view kAsyncCacheSsdGb{"async-cache-ssd-gb"};
   static constexpr std::string_view kAsyncCacheSsdCheckpointGb{
       "async-cache-ssd-checkpoint-gb"};
@@ -422,8 +431,8 @@ class SystemConfig : public ConfigBase {
   /// Specifies the max time to wait for memory reclaim by arbitration. The
   /// memory reclaim might fail if the max wait time has exceeded. If it is
   /// zero, then there is no timeout.
-  static constexpr std::string_view kSharedArbitratorMemoryReclaimMaxWaitTime{
-      "shared-arbitrator.memory-reclaim-max-wait-time"};
+  static constexpr std::string_view kSharedArbitratorMaxMemoryArbitrationTime{
+      "shared-arbitrator.max-memory-arbitration-time"};
 
   /// When shared arbitrator grows memory pool's capacity, the growth bytes will
   /// be adjusted in the following way:
@@ -695,6 +704,10 @@ class SystemConfig : public ConfigBase {
 
   int32_t maxDriversPerTask() const;
 
+  folly::Optional<int32_t> taskWriterCount() const;
+
+  folly::Optional<int32_t> taskPartitionedWriterCount() const;
+
   int32_t concurrentLifespansPerTask() const;
 
   double httpServerNumIoThreadsHwMultiplier() const;
@@ -745,6 +758,8 @@ class SystemConfig : public ConfigBase {
 
   bool asyncDataCacheEnabled() const;
 
+  bool queryDataCacheEnabledDefault() const;
+
   uint64_t asyncCacheSsdGb() const;
 
   uint64_t asyncCacheSsdCheckpointGb() const;
@@ -785,7 +800,7 @@ class SystemConfig : public ConfigBase {
 
   std::string sharedArbitratorMemoryPoolReservedCapacity() const;
 
-  std::string sharedArbitratorMemoryReclaimWaitTime() const;
+  std::string sharedArbitratorMaxMemoryArbitrationTime() const;
 
   std::string sharedArbitratorMemoryPoolInitialCapacity() const;
 

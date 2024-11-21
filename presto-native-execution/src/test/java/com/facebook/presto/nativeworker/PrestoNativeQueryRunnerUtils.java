@@ -171,7 +171,6 @@ public class PrestoNativeQueryRunnerUtils
                 HiveQueryRunner.createQueryRunner(
                         ImmutableList.of(),
                         ImmutableMap.of(
-                                "parse-decimal-literals-as-double", "true",
                                 "regex-library", "RE2J",
                                 "offset-clause-enabled", "true"),
                         security,
@@ -180,11 +179,19 @@ public class PrestoNativeQueryRunnerUtils
         return queryRunner;
     }
 
-    public static void createExternalTable(QueryRunner queryRunner, String schemaName, String tableName, List<Column> columns)
+    public static void createSchemaIfNotExist(QueryRunner queryRunner, String schemaName)
+    {
+        ExtendedHiveMetastore metastore = getFileHiveMetastore((DistributedQueryRunner) queryRunner);
+        if (!metastore.getDatabase(METASTORE_CONTEXT, schemaName).isPresent()) {
+            metastore.createDatabase(METASTORE_CONTEXT, createDatabaseMetastoreObject(schemaName));
+        }
+    }
+
+    public static void createExternalTable(QueryRunner queryRunner, String sourceSchemaName, String tableName, List<Column> columns, String targetSchemaName)
     {
         ExtendedHiveMetastore metastore = getFileHiveMetastore((DistributedQueryRunner) queryRunner);
         File dataDirectory = ((DistributedQueryRunner) queryRunner).getCoordinator().getDataDirectory().resolve(HIVE_DATA).toFile();
-        Path hiveTableDataPath = dataDirectory.toPath().resolve(schemaName).resolve(tableName);
+        Path hiveTableDataPath = dataDirectory.toPath().resolve(sourceSchemaName).resolve(tableName);
         Path symlinkTableDataPath = dataDirectory.toPath().getParent().resolve(SYMLINK_FOLDER).resolve(tableName);
 
         try {
@@ -194,11 +201,9 @@ public class PrestoNativeQueryRunnerUtils
             throw new PrestoException(() -> CREATE_ERROR_CODE, "Failed to create symlink manifest file for table: " + tableName, e);
         }
 
-        if (!metastore.getDatabase(METASTORE_CONTEXT, schemaName).isPresent()) {
-            metastore.createDatabase(METASTORE_CONTEXT, createDatabaseMetastoreObject(schemaName));
-        }
-        if (!metastore.getTable(METASTORE_CONTEXT, schemaName, tableName).isPresent()) {
-            metastore.createTable(METASTORE_CONTEXT, createHiveSymlinkTable(schemaName, tableName, columns, symlinkTableDataPath.toString()), PRINCIPAL_PRIVILEGES, emptyList());
+        createSchemaIfNotExist(queryRunner, targetSchemaName);
+        if (!metastore.getTable(METASTORE_CONTEXT, targetSchemaName, tableName).isPresent()) {
+            metastore.createTable(METASTORE_CONTEXT, createHiveSymlinkTable(targetSchemaName, tableName, columns, symlinkTableDataPath.toString()), PRINCIPAL_PRIVILEGES, emptyList());
         }
     }
 
@@ -222,7 +227,6 @@ public class PrestoNativeQueryRunnerUtils
 
         DistributedQueryRunner queryRunner = createIcebergQueryRunner(
                 ImmutableMap.of(
-                        "parse-decimal-literals-as-double", "true",
                         "regex-library", "RE2J",
                         "offset-clause-enabled", "true",
                         "query.max-stage-count", "110"),

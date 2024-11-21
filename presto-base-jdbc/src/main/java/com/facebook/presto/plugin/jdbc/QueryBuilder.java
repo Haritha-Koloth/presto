@@ -211,6 +211,10 @@ public class QueryBuilder
                 throw new UnsupportedOperationException("Can't handle type: " + typeAndValue.getType());
             }
         }
+        // TODO This is just for debugging. Change to debug after testing
+        log.info("Query is not Pushed down ");
+        log.info("Normal query: " + sql);
+        log.info("QueryBuilder.buildSql() :: Normal Query ", sql.toString());
         return statement;
     }
 
@@ -310,6 +314,10 @@ public class QueryBuilder
                 throw new UnsupportedOperationException("Can't handle type: " + typeAndValue.getType());
             }
         }
+        //TODO Change to debug after testing
+        log.info("Query is Pushed down ");
+        log.info("Join query: " + sql);
+        log.info("QueryBuilder.buildJoinSql() :: Join Query ", sql.toString());
         return statement;
     }
 
@@ -385,7 +393,11 @@ public class QueryBuilder
             disjuncts.add(toPredicate(columnName, "=", getOnlyElement(singleValues), columnHandle, accumulator, joinPushdownEnabled));
         }
         else if (singleValues.size() > 1) {
+            for (Object value : singleValues) {
+                bindValue(value, columnHandle, accumulator);
+            }
             String values = Joiner.on(",").join(nCopies(singleValues.size(), "?"));
+            disjuncts.add(getColumnIdentifier(columnName, columnHandle, joinPushdownEnabled) + " IN (" + values + ")");
         }
 
         // Add nullability disjuncts

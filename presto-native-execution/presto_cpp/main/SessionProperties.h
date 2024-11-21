@@ -131,11 +131,13 @@ class SessionProperties {
   static constexpr const char* kWriterSpillEnabled =
       "native_writer_spill_enabled";
 
-  /// The number of bits (N) used to calculate the spilling
-  /// partition number for hash join and RowNumber: 2 ^ N
-  static constexpr const char* kJoinSpillPartitionBits =
-      "native_join_spiller_partition_bits";
+  /// Minimum memory footprint size required to reclaim memory from a file
+  /// writer by flushing its buffered data to disk.
+  static constexpr const char* kWriterFlushThresholdBytes =
+      "native_writer_flush_threshold_bytes";
 
+  /// The number of bits (N) used to calculate the spilling partition number for
+  /// hash join and RowNumber: 2 ^ N
   static constexpr const char* kSpillerNumPartitionBits =
       "native_spiller_num_partition_bits";
 
@@ -217,6 +219,28 @@ class SessionProperties {
   /// destination before producing a SerializedPage.
   static constexpr const char* kMaxPartitionedOutputBufferSize =
       "native_max_page_partitioning_buffer_size";
+
+  /// Maximum number of partitions created by a local exchange.
+  /// Affects concurrency for pipelines containing LocalPartitionNode.
+  static constexpr const char* kMaxLocalExchangePartitionCount =
+      "native_max_local_exchange_partition_count";
+
+  /// Enable the prefix sort or fallback to std::sort in spill. The prefix sort
+  /// is faster than std::sort but requires the memory to build normalized
+  /// prefix keys, which might have potential risk of running out of server
+  /// memory.
+  static constexpr const char* kSpillPrefixSortEnabled =
+      "spill_prefixsort_enabled";
+
+  /// Maximum number of bytes to use for the normalized key in prefix-sort. Use
+  /// 0 to disable prefix-sort.
+  static constexpr const char* kPrefixSortNormalizedKeyMaxBytes =
+      "native_prefixsort_normalized_key_max_bytes";
+
+  /// Minimum number of rows to use prefix-sort. The default value (130) has
+  /// been derived using micro-benchmarking.
+  static constexpr const char* kPrefixSortMinRows =
+      "native_prefixsort_min_rows";
 
   SessionProperties();
 

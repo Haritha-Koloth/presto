@@ -15,7 +15,6 @@ package com.facebook.presto.sql.planner.optimizations;
 
 import com.facebook.airlift.log.Logger;
 import com.facebook.presto.Session;
-import com.facebook.presto.SystemSessionProperties;
 import com.facebook.presto.common.function.OperatorType;
 import com.facebook.presto.expressions.DefaultRowExpressionTraversalVisitor;
 import com.facebook.presto.expressions.LogicalRowExpressions;
@@ -31,6 +30,7 @@ import com.facebook.presto.spi.VariableAllocator;
 import com.facebook.presto.spi.WarningCollector;
 import com.facebook.presto.spi.plan.Assignments;
 import com.facebook.presto.spi.plan.FilterNode;
+import com.facebook.presto.spi.plan.JoinNode;
 import com.facebook.presto.spi.plan.PlanNode;
 import com.facebook.presto.spi.plan.PlanNodeIdAllocator;
 import com.facebook.presto.spi.plan.ProjectNode;
@@ -43,7 +43,6 @@ import com.facebook.presto.sql.planner.EqualityInference;
 import com.facebook.presto.sql.planner.NullabilityAnalyzer;
 import com.facebook.presto.sql.planner.TypeProvider;
 import com.facebook.presto.sql.planner.plan.AssignmentUtils;
-import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.MultiJoinNode;
 import com.facebook.presto.sql.planner.plan.SimplePlanRewriter;
 import com.facebook.presto.sql.relational.FunctionResolution;
@@ -68,6 +67,7 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import static com.facebook.presto.SystemSessionProperties.INEQUALITY_JOIN_PUSHDOWN_ENABLED;
+import static com.facebook.presto.SystemSessionProperties.isInnerJoinPushdownEnabled;
 import static com.facebook.presto.common.function.OperatorType.GREATER_THAN;
 import static com.facebook.presto.common.function.OperatorType.GREATER_THAN_OR_EQUAL;
 import static com.facebook.presto.common.function.OperatorType.LESS_THAN;
@@ -120,6 +120,7 @@ public class GroupInnerJoinsByConnector
     private final FunctionResolution functionResolution;
     private final DeterminismEvaluator determinismEvaluator;
     private final Metadata metadata;
+    private boolean isEnabledForTesting;
 
     public GroupInnerJoinsByConnector(Metadata metadata)
     {
@@ -131,11 +132,23 @@ public class GroupInnerJoinsByConnector
     @Override
     public PlanOptimizerResult optimize(PlanNode plan, Session session, TypeProvider types, VariableAllocator variableAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
-        if (SystemSessionProperties.isInnerJoinPushdownEnabled(session)) {
+        if (isEnabled(session)) {
             PlanNode rewrittenPlan = SimplePlanRewriter.rewriteWith(new Rewriter(functionResolution, determinismEvaluator, idAllocator, metadata, session), plan);
             return PlanOptimizerResult.optimizerResult(rewrittenPlan, !rewrittenPlan.equals(plan));
         }
         return PlanOptimizerResult.optimizerResult(plan, false);
+    }
+
+    @Override
+    public void setEnabledForTesting(boolean isSet)
+    {
+        isEnabledForTesting = isSet;
+    }
+
+    @Override
+    public boolean isEnabled(Session session)
+    {
+        return isEnabledForTesting || isInnerJoinPushdownEnabled(session);
     }
 
     private static class Rewriter

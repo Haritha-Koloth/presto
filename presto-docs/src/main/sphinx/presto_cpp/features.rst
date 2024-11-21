@@ -153,6 +153,15 @@ is valid.
 If the time period exceeds the parameter value, the request is rejected as
 authentication failure (HTTP 401).
 
+LinuxMemoryChecker
+------------------
+
+The LinuxMemoryChecker extends from PeriodicMemoryChecker and periodically checks 
+memory usage using memory calculation from inactive_anon + active_anon in the memory stat 
+file from Linux cgroups V1 or V2. The LinuxMemoryChecker is used for Linux systems only.
+
+The LinuxMemoryChecker can be enabled by setting the CMake flag ``PRESTO_MEMORY_CHECKER_TYPE=LINUX_MEMORY_CHECKER``. 
+
 Async Data Cache and Prefetching
 --------------------------------
 
@@ -174,6 +183,17 @@ disabled if ``connector.num-io-threads-hw-multiplier`` is set to zero.
 * **Presto on Spark default value:** ``false``
 
 Whether async data cache is enabled.
+
+``query-data-cache-enabled-default``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* **Type** ``bool``
+* **Default value:** ``true``
+
+If ``true``, SSD cache is enabled by default and is disabled only if
+``node_selection_strategy`` is present and set to ``NO_PREFERENCE``.
+Otherwise, SSD cache is disabled by default and is enabled if
+``node_selection_strategy`` is present and set to ``SOFT_AFFINITY``.
 
 ``async-cache-ssd-gb``
 ^^^^^^^^^^^^^^^^^^^^^^
