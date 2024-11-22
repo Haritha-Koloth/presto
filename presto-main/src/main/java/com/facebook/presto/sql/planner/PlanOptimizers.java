@@ -771,6 +771,10 @@ public class PlanOptimizers
         // After this step, nodes with same `statsEquivalentPlanNode` will share same history based statistics.
         builder.add(new StatsRecordingPlanOptimizer(optimizerStats, new HistoricalStatisticsEquivalentPlanMarkingOptimizer(statsCalculator)));
 
+        builder.add(new GroupInnerJoinsByConnector(metadata));
+        builder.add(new ApplyConnectorOptimization(() -> planOptimizerManager.getOptimizers(STRUCTURAL)));
+        builder.add(predicatePushDown, simplifyRowExpressionOptimizer);
+
         builder.add(new IterativeOptimizer(
                 metadata,
                 ruleStats,
