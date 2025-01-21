@@ -39,8 +39,6 @@ import com.facebook.presto.spi.JoinTableSet;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.TableHandle;
 import com.facebook.presto.spi.TestingColumnHandle;
-import com.facebook.presto.spi.VariableAllocator;
-import com.facebook.presto.spi.WarningCollector;
 import com.facebook.presto.spi.connector.Connector;
 import com.facebook.presto.spi.connector.ConnectorCapabilities;
 import com.facebook.presto.spi.plan.EquiJoinClause;
@@ -407,8 +405,9 @@ public class TestGroupInnerJoinsByConnector
 
     private PlanNode optimize(PlanNode plan, Session session, Map<ConnectorId, Set<ConnectorPlanOptimizer>> optimizers, Metadata metadata)
     {
-        GroupInnerJoinsByConnector optimizer = new GroupInnerJoinsByConnector(metadata);
-        return optimizer.optimize(plan, session, TypeProvider.empty(), new VariableAllocator(), new PlanNodeIdAllocator(), WarningCollector.NOOP).getPlanNode();
+        GroupInnerJoinsByConnectorRuleSet.OnlyJoinRule optimizer = new GroupInnerJoinsByConnectorRuleSet.OnlyJoinRule(metadata);
+//        return optimizer.optimize(plan, session, TypeProvider.empty(), new VariableAllocator(), new PlanNodeIdAllocator(), WarningCollector.NOOP).getPlanNode();
+        return null; // TODO UPDATE TESTS AFTER CHANGING OPTIMZER TO ITERATIVE
     }
 
     private OutputNode output(PlanNode source, String... columnNames)

@@ -124,7 +124,7 @@ public class JdbcJoinPushdown
                 });
 
                 TableHandle newTableHandle = new TableHandle(tableHandle.getConnectorId(), newConnectorTableHandle, tableHandle.getTransaction(), optionalTableLayoutHandle, tableHandle.getDynamicFilter());
-                return new TableScanNode(node.getSourceLocation(), node.getId(), newTableHandle, node.getOutputVariables(), groupAssignments, node.getCurrentConstraint(), node.getEnforcedConstraint());
+                return new TableScanNode(node.getSourceLocation(), node.getId(), newTableHandle, node.getOutputVariables(), groupAssignments, node.getCurrentConstraint(), node.getEnforcedConstraint(), node.getCteMaterializationInfo());
             }
             return node;
         }
