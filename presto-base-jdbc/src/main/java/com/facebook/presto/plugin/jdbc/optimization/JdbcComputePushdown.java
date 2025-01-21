@@ -228,8 +228,6 @@ public class JdbcComputePushdown
                     oldTableScanNode.getCurrentConstraint(),
                     oldTableScanNode.getEnforcedConstraint(),
                     oldTableScanNode.getCteMaterializationInfo());
-
-            return new FilterNode(node.getSourceLocation(), idAllocator.getNextId(), newTableScanNode, node.getPredicate());
         }
     }
 }
