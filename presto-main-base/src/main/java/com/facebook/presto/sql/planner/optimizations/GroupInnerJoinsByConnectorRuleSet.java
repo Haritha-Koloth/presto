@@ -287,6 +287,146 @@ public class GroupInnerJoinsByConnectorRuleSet
             isEnabledForTesting = isSet;
         }
 
+        @Override
+        public Pattern<JoinNode> getPattern()
+        {
+            return join().matching(
+                    joinNode -> joinNode.getType() == INNER
+                            && determinismEvaluator.isDeterministic(joinNode.getFilter().orElse(TRUE_CONSTANT)));
+        }
+
+        @Override
+        public boolean isEnabled(Session session)
+        {
+            return isEnabledForTesting || isInnerJoinPushdownEnabled(session);
+        }
+
+        @Override
+        public Result apply(JoinNode node, Captures captures, Context context)
+        {
+            PlanNode rewrittenPlan = getCombinedJoin(node, functionResolution, determinismEvaluator, metadata, context.getSession(), context.getLookup(), (PlanNodeIdAllocator) context.getIdAllocator());
+
+            if (rewrittenPlan.equals(node)) {
+                return Result.empty();
+            }
+            else {
+                return Result.ofPlanNode(rewrittenPlan);
+            }
+        }
+    }
+
+    public static class FilterOnJoinRule
+            extends BaseGroupInnerJoinsByConnector
+            implements Rule<FilterNode>
+    {
+        private static final Capture<JoinNode> JOIN = newCapture();
+
+        public FilterOnJoinRule(Metadata metadata)
+        {
+            super(metadata);
+        }
+
+        @Override
+        public Pattern<FilterNode> getPattern()
+        {
+            return Patterns.filter().with(source().matching(join().matching(
+                    joinNode -> joinNode.getType() == INNER
+                            && determinismEvaluator.isDeterministic(joinNode.getFilter().orElse(TRUE_CONSTANT))).capturedAs(JOIN)));
+        }
+
+        @Override
+        public boolean isEnabled(Session session)
+        {
+            return isEnabledForTesting || isInnerJoinPushdownEnabled(session);
+        }
+
+        @Override
+        public Result apply(FilterNode filterNode, Captures captures, Context context)
+        {
+            JoinNode capturedJoinNode = captures.get(JOIN);
+
+            ImmutableList.Builder<RowExpression> predicates = ImmutableList.builder();
+            predicates.add(filterNode.getPredicate()); // Add FilterNode's filter
+            capturedJoinNode.getFilter().ifPresent(predicates::add);  // Combine with JoinNode's filter
+
+            JoinNode joinNode = new JoinNode(capturedJoinNode.getSourceLocation(),
+                    context.getIdAllocator().getNextId(),
+                    capturedJoinNode.getStatsEquivalentPlanNode(),
+                    capturedJoinNode.getType(),
+                    capturedJoinNode.getLeft(),
+                    capturedJoinNode.getRight(),
+                    capturedJoinNode.getCriteria(),
+                    capturedJoinNode.getOutputVariables(),
+                    Optional.of(LogicalRowExpressions.and(predicates.build())),
+                    capturedJoinNode.getLeftHashVariable(),
+                    capturedJoinNode.getRightHashVariable(),
+                    capturedJoinNode.getDistributionType(),
+                    capturedJoinNode.getDynamicFilters());
+
+            PlanNode rewrittenPlan = getCombinedJoin(joinNode, functionResolution, determinismEvaluator, metadata, context.getSession(), context.getLookup(), context.getIdAllocator());
+
+            if (rewrittenPlan.equals(filterNode)) {
+                return Result.empty();
+            }
+            else {
+                return Result.ofPlanNode(rewrittenPlan);
+            }
+        }
+    }
+
+    public abstract static class BaseGroupInnerJoinsByConnector
+    {
+        final FunctionResolution functionResolution;
+        final DeterminismEvaluator determinismEvaluator;
+        final Metadata metadata;
+        final NullabilityAnalyzer nullabilityAnalyzer;
+        boolean isEnabledForTesting;
+
+        final FunctionAndTypeManager functionAndTypeManager;
+
+        public BaseGroupInnerJoinsByConnector(Metadata metadata)
+        {
+            this.functionResolution = new FunctionResolution(metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver());
+            this.determinismEvaluator = new RowExpressionDeterminismEvaluator(metadata.getFunctionAndTypeManager());
+            this.metadata = metadata;
+            this.functionAndTypeManager = metadata.getFunctionAndTypeManager();
+            this.nullabilityAnalyzer = new NullabilityAnalyzer(functionAndTypeManager);
+        }
+
+        public void setEnabledForTesting(boolean isSet)
+        {
+            isEnabledForTesting = isSet;
+        }
+
+        //    private static class Rewriter
+        //            extends SimplePlanRewriter<Void>
+        //    {
+        //        private final FunctionResolution functionResolution;
+        //        private final DeterminismEvaluator determinismEvaluator;
+        //        private final NullabilityAnalyzer nullabilityAnalyzer;
+        //        private final PlanNodeIdAllocator idAllocator;
+        //        private final Metadata metadata;
+        //        private final LogicalRowExpressions logicalRowExpressions;
+        //        private final Session session;
+        //        private final FunctionAndTypeManager functionAndTypeManager;
+        //        private final Lookup lookup;
+        //
+        //        private Rewriter(FunctionResolution functionResolution, DeterminismEvaluator determinismEvaluator, PlanNodeIdAllocator idAllocator, Metadata metadata, Session session, Lookup lookup)
+        //        {
+        //            this.functionResolution = requireNonNull(functionResolution, "functionResolution is null");
+        //            this.determinismEvaluator = requireNonNull(determinismEvaluator, "determinismEvaluator is null");
+        //            this.idAllocator = requireNonNull(idAllocator, "idAllocator is null");
+        //            this.metadata = requireNonNull(metadata, "metadata is null");
+        //            this.functionAndTypeManager = metadata.getFunctionAndTypeManager();
+        //            this.logicalRowExpressions = new LogicalRowExpressions(
+        //                    determinismEvaluator,
+        //                    functionResolution,
+        //                    functionAndTypeManager);
+        //            this.nullabilityAnalyzer = new NullabilityAnalyzer(functionAndTypeManager);
+        //            this.session = requireNonNull(session, "session is null");
+        //            this.lookup = requireNonNull(lookup, "lookup is null");
+        //        }
+
         private static List<RowExpression> getExpressionsWithinVariableScope(Set<RowExpression> rowExpressions, Set<VariableReferenceExpression> variableScope)
         {
             return rowExpressions.stream()

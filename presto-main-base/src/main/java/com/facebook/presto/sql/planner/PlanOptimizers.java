@@ -776,6 +776,7 @@ public class PlanOptimizers
                 statsCalculator,
                 estimatedExchangesCostCalculator,
                 new GroupInnerJoinsByConnectorRuleSet(metadata).rules()));
+        builder.add(new ApplyConnectorOptimization(() -> planOptimizerManager.getOptimizers(STRUCTURAL)));
         // GroupInnerJoinsByConnectorRuleSet pulls up filters, we need to push these down again
         builder.add(predicatePushDown, simplifyRowExpressionOptimizer);
 
