@@ -13,10 +13,9 @@
  */
 package com.facebook.presto.spi;
 
-import com.google.common.base.Joiner;
-
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class JoinTableSet
         implements ConnectorTableHandle
@@ -55,6 +54,8 @@ public class JoinTableSet
     @Override
     public String toString()
     {
-        return Joiner.on(":").useForNull("null").join(innerJoinTableInfos.iterator());
+        return innerJoinTableInfos.stream()
+            .map(info -> info != null ? info.toString() : "null")
+            .collect(Collectors.joining(":"));
     }
 }

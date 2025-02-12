@@ -519,6 +519,12 @@ public interface Metadata
     void dropConstraint(Session session, TableHandle tableHandle, Optional<String> constraintName, Optional<String> columnName);
 
     void addConstraint(Session session, TableHandle tableHandle, TableConstraint<String> tableConstraint);
+
+    /**
+     * Check if the join predicate can be translated and pushed down to the underlying datasource
+     *
+     * @return TRUE if there is connector is able to translate and push down join predicate to the underlying datasource, FALSE otherwise
+     */
     default boolean isPushdownSupportedForFilter(Session session, TableHandle tableHandle, RowExpression filter, Map<VariableReferenceExpression, ColumnHandle> symbolToColumnHandleMap)
     {
         return false;

@@ -2887,7 +2887,7 @@ public class FeaturesConfig
     }
 
     @Config("optimizer.inner-join-pushdown-enabled")
-    @ConfigDescription("push down inner join predicates to database")
+    @ConfigDescription("Push down inner join predicates to database")
     public FeaturesConfig setInnerJoinPushdownEnabled(boolean innerJoinPushdownEnabled)
     {
         this.innerJoinPushdownEnabled = innerJoinPushdownEnabled;
@@ -2900,7 +2900,7 @@ public class FeaturesConfig
     }
 
     @Config("optimizer.inequality-join-pushdown-enabled")
-    @ConfigDescription("push down inner join inequality predicates to database")
+    @ConfigDescription("Push down inner join inequality predicates to database")
     public FeaturesConfig setInEqualityJoinPushdownEnabled(boolean inEqualityJoinPushdownEnabled)
     {
         this.inEqualityJoinPushdownEnabled = inEqualityJoinPushdownEnabled;
