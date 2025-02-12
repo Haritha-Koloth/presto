@@ -202,7 +202,6 @@ import java.util.Set;
 
 import static com.facebook.presto.sql.planner.ConnectorPlanOptimizerManager.PlanPhase.LOGICAL;
 import static com.facebook.presto.sql.planner.ConnectorPlanOptimizerManager.PlanPhase.PHYSICAL;
-import static com.facebook.presto.sql.planner.ConnectorPlanOptimizerManager.PlanPhase.STRUCTURAL;
 
 public class PlanOptimizers
 {
@@ -771,8 +770,13 @@ public class PlanOptimizers
         // After this step, nodes with same `statsEquivalentPlanNode` will share same history based statistics.
         builder.add(new StatsRecordingPlanOptimizer(optimizerStats, new HistoricalStatisticsEquivalentPlanMarkingOptimizer(statsCalculator)));
 
-        builder.add(new GroupInnerJoinsByConnector(metadata));
-        builder.add(new ApplyConnectorOptimization(() -> planOptimizerManager.getOptimizers(STRUCTURAL)));
+        builder.add(new IterativeOptimizer(
+                metadata,
+                ruleStats,
+                statsCalculator,
+                estimatedExchangesCostCalculator,
+                new GroupInnerJoinsByConnectorRuleSet(metadata).rules()));
+        // GroupInnerJoinsByConnectorRuleSet pulls up filters, we need to push these down again
         builder.add(predicatePushDown, simplifyRowExpressionOptimizer);
 
         builder.add(new IterativeOptimizer(
