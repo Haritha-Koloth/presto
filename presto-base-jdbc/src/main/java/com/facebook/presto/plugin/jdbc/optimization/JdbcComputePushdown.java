@@ -143,7 +143,7 @@ public class JdbcComputePushdown
                 return node;
             }
 
-            RowExpression predicate = expressionOptimizer.optimize(node.getPredicate(), OPTIMIZED, session);
+            RowExpression predicate = expressionOptimizerProvider.getExpressionOptimizer(session).optimize(node.getPredicate(), OPTIMIZED, session);
             predicate = logicalRowExpressions.convertToConjunctiveNormalForm(predicate);
 
             JdbcTableHandle tableHandle = (JdbcTableHandle) oldTableScanNode.getTable().getConnectorHandle();
@@ -168,7 +168,7 @@ public class JdbcComputePushdown
             List<RowExpression> remainingExpressions = new ArrayList<>();
             List<JdbcExpression> translatedExpressions = new ArrayList<>();
 
-            predicate = expressionOptimizer.optimize(node.getPredicate(), SERIALIZABLE, session);
+            predicate = expressionOptimizerProvider.getExpressionOptimizer(session).optimize(node.getPredicate(), SERIALIZABLE, session);
             List<RowExpression> rowExpressions = LogicalRowExpressions.extractConjuncts(predicate);
             for (RowExpression expression : rowExpressions) {
                 TranslatedExpression<JdbcExpression> translatedExpression = translateWith(

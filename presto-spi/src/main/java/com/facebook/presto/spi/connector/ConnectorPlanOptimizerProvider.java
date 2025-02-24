@@ -14,7 +14,6 @@
 package com.facebook.presto.spi.connector;
 
 import com.facebook.presto.spi.ConnectorPlanOptimizer;
-import com.google.common.collect.ImmutableSet;
 
 import java.util.Collections;
 import java.util.Set;
