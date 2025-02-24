@@ -96,17 +96,40 @@ import static java.util.Objects.requireNonNull;
 /**
  * This optimizer attempts to group TableScanNode's of an inner-join graph that belong to the same connector
  * This allows those connectors that can participate in join pushdown, to rewrite these sources to a new TableScanNode that represents the result of the pushed down join
+ * This re-written join graph has filter's pulled up, so filters need to be re pushed down again with the PredicatePushdown rule
  * <p>
- * Example:
+ * Example 1:
  * Before Transformation:
  * --OutputNode
  * `-- InnerJoin1
- * |-- InnerJoin2 (Left)
- * |   |-- TableScanNode1 (Left)
+ * |-- InnerJoin2
+ * |   |-- TableScanNode1
  * |   |   `-- TableHandle1
- * |   `-- TableScanNode2 (Right)
+ * |   `-- TableScanNode2
  * |       `-- TableHandle2
- * `-- TableScanNode3 (Right)
+ * `-- TableScanNode3
+ * `-- TableHandle3
+ * <p>
+ * Suppose that TableScanNode1, TableScanNode2 and TableScanNode3 are from the same catalog.
+ * <p>
+ * After Transformation:
+ * --OutputNode
+ * `-- TableScanNode (with all the details of the three TableScanNodes)
+ * `-- Set<ConnectorTableHandle> (ConnectorHandleSet)
+ * `-- TableHandle1
+ * `-- TableHandle2
+ * `-- TableHandle3
+ * <p>
+ * Example 2:
+ * Before Transformation:
+ * --OutputNode
+ * `-- InnerJoin1
+ * |-- InnerJoin2
+ * |   |-- TableScanNode1
+ * |   |   `-- TableHandle1
+ * |   `-- TableScanNode2
+ * |       `-- TableHandle2
+ * `-- TableScanNode3
  * `-- TableHandle3
  * <p>
  * Suppose that TableScanNode1, TableScanNode2 and TableScanNode3 are from the same catalog.
@@ -119,6 +142,7 @@ import static java.util.Objects.requireNonNull;
  * `-- TableHandle2
  * `-- TableHandle3
  */
+
 public class GroupInnerJoinsByConnectorRuleSet
 {
     private final Metadata metadata;
@@ -136,8 +160,7 @@ public class GroupInnerJoinsByConnectorRuleSet
     }
 
     public static class OnlyJoinRule
-            extends BaseGroupInnerJoinsByConnector
-            implements Rule<JoinNode>
+            extends BaseGroupInnerJoinsByConnector<JoinNode>
     {
         public OnlyJoinRule(Metadata metadata)
         {
@@ -150,12 +173,6 @@ public class GroupInnerJoinsByConnectorRuleSet
             return join().matching(
                     joinNode -> joinNode.getType() == INNER
                             && determinismEvaluator.isDeterministic(joinNode.getFilter().orElse(TRUE_CONSTANT)));
-        }
-
-        @Override
-        public boolean isEnabled(Session session)
-        {
-            return isEnabledForTesting || isInnerJoinPushdownEnabled(session);
         }
 
         @Override
@@ -173,8 +190,7 @@ public class GroupInnerJoinsByConnectorRuleSet
     }
 
     public static class FilterOnJoinRule
-            extends BaseGroupInnerJoinsByConnector
-            implements Rule<FilterNode>
+            extends BaseGroupInnerJoinsByConnector<FilterNode>
     {
         private static final Capture<JoinNode> JOIN = newCapture();
 
@@ -189,12 +205,6 @@ public class GroupInnerJoinsByConnectorRuleSet
             return Patterns.filter().with(source().matching(join().matching(
                     joinNode -> joinNode.getType() == INNER
                             && determinismEvaluator.isDeterministic(joinNode.getFilter().orElse(TRUE_CONSTANT))).capturedAs(JOIN)));
-        }
-
-        @Override
-        public boolean isEnabled(Session session)
-        {
-            return isEnabledForTesting || isInnerJoinPushdownEnabled(session);
         }
 
         @Override
@@ -231,7 +241,8 @@ public class GroupInnerJoinsByConnectorRuleSet
         }
     }
 
-    public abstract static class BaseGroupInnerJoinsByConnector
+    public abstract static class BaseGroupInnerJoinsByConnector<T>
+            implements Rule<T>
     {
         final FunctionResolution functionResolution;
         final DeterminismEvaluator determinismEvaluator;
@@ -250,39 +261,16 @@ public class GroupInnerJoinsByConnectorRuleSet
             this.nullabilityAnalyzer = new NullabilityAnalyzer(functionAndTypeManager);
         }
 
+        @Override
+        public boolean isEnabled(Session session)
+        {
+            return isEnabledForTesting || isInnerJoinPushdownEnabled(session);
+        }
+
         public void setEnabledForTesting(boolean isSet)
         {
             isEnabledForTesting = isSet;
         }
-
-        //    private static class Rewriter
-        //            extends SimplePlanRewriter<Void>
-        //    {
-        //        private final FunctionResolution functionResolution;
-        //        private final DeterminismEvaluator determinismEvaluator;
-        //        private final NullabilityAnalyzer nullabilityAnalyzer;
-        //        private final PlanNodeIdAllocator idAllocator;
-        //        private final Metadata metadata;
-        //        private final LogicalRowExpressions logicalRowExpressions;
-        //        private final Session session;
-        //        private final FunctionAndTypeManager functionAndTypeManager;
-        //        private final Lookup lookup;
-        //
-        //        private Rewriter(FunctionResolution functionResolution, DeterminismEvaluator determinismEvaluator, PlanNodeIdAllocator idAllocator, Metadata metadata, Session session, Lookup lookup)
-        //        {
-        //            this.functionResolution = requireNonNull(functionResolution, "functionResolution is null");
-        //            this.determinismEvaluator = requireNonNull(determinismEvaluator, "determinismEvaluator is null");
-        //            this.idAllocator = requireNonNull(idAllocator, "idAllocator is null");
-        //            this.metadata = requireNonNull(metadata, "metadata is null");
-        //            this.functionAndTypeManager = metadata.getFunctionAndTypeManager();
-        //            this.logicalRowExpressions = new LogicalRowExpressions(
-        //                    determinismEvaluator,
-        //                    functionResolution,
-        //                    functionAndTypeManager);
-        //            this.nullabilityAnalyzer = new NullabilityAnalyzer(functionAndTypeManager);
-        //            this.session = requireNonNull(session, "session is null");
-        //            this.lookup = requireNonNull(lookup, "lookup is null");
-        //        }
 
         private static List<RowExpression> getExpressionsWithinVariableScope(Set<RowExpression> rowExpressions, Set<VariableReferenceExpression> variableScope)
         {
@@ -337,12 +325,10 @@ public class GroupInnerJoinsByConnectorRuleSet
 
         protected PlanNode getCombinedJoin(JoinNode node, FunctionResolution functionResolution, DeterminismEvaluator determinismEvaluator, Metadata metadata, Session session, Lookup lookup, PlanNodeIdAllocator idAllocator)
         {
-            if (node.getType() == INNER) {
-                MultiJoinNode groupInnerJoinsMultiJoinNode = new JoinNodeFlattener(node, functionResolution, determinismEvaluator, lookup).toMultiJoinNode();
-                MultiJoinNode rewrittenMultiJoinNode = joinPushdownCombineSources(groupInnerJoinsMultiJoinNode, idAllocator, metadata, session, lookup);
-                if (rewrittenMultiJoinNode.getContainsCombinedSources()) {
-                    return createLeftDeepJoinTree(rewrittenMultiJoinNode, idAllocator);
-                }
+            MultiJoinNode groupInnerJoinsMultiJoinNode = new JoinNodeFlattener(node, functionResolution, determinismEvaluator, lookup).toMultiJoinNode();
+            MultiJoinNode rewrittenMultiJoinNode = joinPushdownCombineSources(groupInnerJoinsMultiJoinNode, idAllocator, metadata, session, lookup);
+            if (rewrittenMultiJoinNode.getContainsCombinedSources()) {
+                return createLeftDeepJoinTree(rewrittenMultiJoinNode, idAllocator);
             }
             return node;
         }
@@ -415,7 +401,7 @@ public class GroupInnerJoinsByConnectorRuleSet
                             return lookup.resolveGroup(planNode);
                         }
                         return Stream.of(planNode);
-                    }).collect(Collectors.toSet());
+                    }).collect(Collectors.toCollection(LinkedHashSet::new));
             for (PlanNode source : sources) {
                 Optional<String> connectorId = getConnectorIdFromSource(source, session, lookup);
                 if (connectorId.isPresent()) {

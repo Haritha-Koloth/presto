@@ -75,6 +75,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.facebook.airlift.testing.Closeables.closeAllRuntimeException;
 import static com.facebook.presto.SessionTestUtils.TEST_SESSION;
@@ -168,13 +169,19 @@ public class TestGroupInnerJoinsByConnectorRuleSet
         EquiJoinClause joinClause = new EquiJoinClause(left, right);
 
         Set<JoinTableInfo> joinTableInfos = new HashSet<>();
-        Map<VariableReferenceExpression, ColumnHandle> assignments = ImmutableMap.of(newBigintVariable("a1"), new TestingColumnHandle("a1"), newBigintVariable("a2"),
+        Map<VariableReferenceExpression, ColumnHandle> assignments1 = ImmutableMap.of(newBigintVariable("b1"), new TestingColumnHandle("b1"), newBigintVariable("a1"),
+                new TestingColumnHandle("a1"));
+        List<VariableReferenceExpression> outputVariables1 = ImmutableList.of(newBigintVariable("a1"), newBigintVariable("b1"));
+        Map<VariableReferenceExpression, ColumnHandle> assignments2 = ImmutableMap.of(newBigintVariable("b2"), new TestingColumnHandle("b2"), newBigintVariable("a2"),
                 new TestingColumnHandle("a2"));
-        List<VariableReferenceExpression> outputVariables = ImmutableList.of(newBigintVariable("a1"), newBigintVariable("a2"));
-        JoinTableInfo joinTableInfo = new JoinTableInfo(new TestingMetadata.TestingTableHandle(new SchemaTableName("table_schema", "test-table")),
-                assignments, outputVariables);
-        joinTableInfos.add(joinTableInfo);
-        JoinTableSet tableHandleSet = new JoinTableSet(ImmutableSet.copyOf(joinTableInfos));
+        List<VariableReferenceExpression> outputVariables2 = ImmutableList.of(newBigintVariable("a2"), newBigintVariable("b2"));
+        JoinTableInfo joinTableInfo1 = new JoinTableInfo(new TestingMetadata.TestingTableHandle(new SchemaTableName("test-schema", "test-table")),
+                assignments1, outputVariables1);
+        JoinTableInfo joinTableInfo2 = new JoinTableInfo(new TestingMetadata.TestingTableHandle(new SchemaTableName("test-schema", "test-table")),
+                assignments2, outputVariables2);
+        joinTableInfos.add(joinTableInfo1);
+        joinTableInfos.add(joinTableInfo2);
+        JoinTableSet tableHandleSet = new JoinTableSet(joinTableInfos);
         TableHandle tableHandle = new TableHandle(
                 new ConnectorId(CATALOG_SUPPORTING_JOIN_PUSHDOWN),
                 tableHandleSet,
@@ -186,7 +193,7 @@ public class TestGroupInnerJoinsByConnectorRuleSet
                 tableScan(CATALOG_SUPPORTING_JOIN_PUSHDOWN, "a2", "b2"),
                 joinClause)).matches(project(filter(
                         "a1 = a2 and true",
-                        JoinTableScanMatcher.tableScan(CATALOG_SUPPORTING_JOIN_PUSHDOWN, tableHandle, "a1", "a2", "b1", "b2"))));
+                        JoinTableScanMatcher.tableScan(CATALOG_SUPPORTING_JOIN_PUSHDOWN, tableHandle, "a1", "a2"))));
     }
 
     @Test
@@ -197,13 +204,19 @@ public class TestGroupInnerJoinsByConnectorRuleSet
         EquiJoinClause joinClause = new EquiJoinClause(left, right);
 
         Set<JoinTableInfo> joinTableInfos = new HashSet<>();
-        Map<VariableReferenceExpression, ColumnHandle> assignments = ImmutableMap.of(newBigintVariable("a1"), new TestingColumnHandle("a1"), newBigintVariable("a2"),
-                new TestingColumnHandle("a2"));
-        List<VariableReferenceExpression> outputVariables = ImmutableList.of(newBigintVariable("a1"), newBigintVariable("a2"));
-        JoinTableInfo joinTableInfo = new JoinTableInfo(new TestingMetadata.TestingTableHandle(new SchemaTableName("table_schema", "test-table")),
-                assignments, outputVariables);
-        joinTableInfos.add(joinTableInfo);
-        JoinTableSet tableHandleSet = new JoinTableSet(ImmutableSet.copyOf(joinTableInfos));
+        Map<VariableReferenceExpression, ColumnHandle> assignments1 = ImmutableMap.of(newBigintVariable("a1"), new TestingColumnHandle("a1"), newBigintVariable("b1"),
+                new TestingColumnHandle("b1"));
+        List<VariableReferenceExpression> outputVariables1 = ImmutableList.of(newBigintVariable("a1"), newBigintVariable("b1"));
+        Map<VariableReferenceExpression, ColumnHandle> assignments2 = ImmutableMap.of(newBigintVariable("a2"), new TestingColumnHandle("a2"), newBigintVariable("b2"),
+                new TestingColumnHandle("b2"));
+        List<VariableReferenceExpression> outputVariables2 = ImmutableList.of(newBigintVariable("a2"), newBigintVariable("b2"));
+        JoinTableInfo joinTableInfo1 = new JoinTableInfo(new TestingMetadata.TestingTableHandle(new SchemaTableName("test-schema", "test-table")),
+                assignments1, outputVariables1);
+        JoinTableInfo joinTableInfo2 = new JoinTableInfo(new TestingMetadata.TestingTableHandle(new SchemaTableName("test-schema", "test-table")),
+                assignments2, outputVariables2);
+        joinTableInfos.add(joinTableInfo1);
+        joinTableInfos.add(joinTableInfo2);
+        JoinTableSet tableHandleSet = new JoinTableSet(joinTableInfos);
         TableHandle tableHandle = new TableHandle(
                 new ConnectorId(CATALOG_SUPPORTING_JOIN_PUSHDOWN),
                 tableHandleSet,
@@ -222,7 +235,21 @@ public class TestGroupInnerJoinsByConnectorRuleSet
                 joinClause))
                 .matches(project(filter(
                         "a1 = a2 and a1 > b1 and true",
-                JoinTableScanMatcher.tableScan(CATALOG_SUPPORTING_JOIN_PUSHDOWN, tableHandle, "a1", "a2", "b1", "b2"))));
+                JoinTableScanMatcher.tableScan(CATALOG_SUPPORTING_JOIN_PUSHDOWN, tableHandle, "a1", "a2", "b1"))));
+    }
+
+    @Test
+    public void testPartialPushDownTwoDifferentConnectors()
+    {
+        VariableReferenceExpression left = newBigintVariable("a1");
+        VariableReferenceExpression right = newBigintVariable("a2");
+        EquiJoinClause joinClause = new EquiJoinClause(left, right);
+
+        assertGroupInnerJoinsByConnectorRuleSet().on(p -> p.join(INNER,
+                        tableScan(CATALOG_SUPPORTING_JOIN_PUSHDOWN, "a1", "b1"),
+                        tableScan(LOCAL, "a2", "b2"),
+                        joinClause))
+                .doesNotFire();
     }
 
     private RuleAssert assertGroupInnerJoinsByConnectorRuleSet()
@@ -235,7 +262,10 @@ public class TestGroupInnerJoinsByConnectorRuleSet
         return planBuilder.tableScan(
                 connectorName,
                 Arrays.stream(columnNames).map(TestGroupInnerJoinsByConnectorRuleSet::newBigintVariable).collect(toImmutableList()),
-                Arrays.stream(columnNames).map(TestGroupInnerJoinsByConnectorRuleSet::newBigintVariable).collect(toMap(identity(), variable -> new ColumnHandle() {})));
+                Arrays.stream(columnNames)
+                        .map(TestGroupInnerJoinsByConnectorRuleSet::newBigintVariable)
+                        .collect(Collectors.toMap(identity(),
+                                variable -> new TestingColumnHandle(variable.getName()))));
     }
 
     private static VariableReferenceExpression newBigintVariable(String name)
@@ -317,11 +347,6 @@ public class TestGroupInnerJoinsByConnectorRuleSet
                             columnNames));
         }
 
-        public static PlanMatchPattern tableScan(String connectorName, String... columnNames)
-        {
-            return tableScan(connectorName, null, columnNames);
-        }
-
         private JoinTableScanMatcher(
                 ConnectorId connectorId,
                 TableHandle tableHandle,
@@ -346,7 +371,7 @@ public class TestGroupInnerJoinsByConnectorRuleSet
             ConnectorTableHandle connectorHandle = tableScanNode.getTable().getConnectorHandle();
 
             if (connectorId.equals(tableScanNode.getTable().getConnectorId()) &&
-                    connectorHandle instanceof JoinTableSet && connectorHandle.equals(tableScanNode.getTable().getConnectorHandle())) {
+                    connectorHandle instanceof JoinTableSet && connectorHandle.equals(this.tableHandle.getConnectorHandle())) {
                 return MatchResult.match(SymbolAliases.builder().putAll(Arrays.stream(columns).collect(toMap(identity(), SymbolReference::new))).build());
             }
 
