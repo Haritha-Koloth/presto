@@ -316,8 +316,7 @@ public class GroupInnerJoinsByConnectorRuleSet
     }
 
     public static class FilterOnJoinRule
-            extends BaseGroupInnerJoinsByConnector
-            implements Rule<FilterNode>
+            extends BaseGroupInnerJoinsByConnector<FilterNode>
     {
         private static final Capture<JoinNode> JOIN = newCapture();
 
@@ -332,12 +331,6 @@ public class GroupInnerJoinsByConnectorRuleSet
             return Patterns.filter().with(source().matching(join().matching(
                     joinNode -> joinNode.getType() == INNER
                             && determinismEvaluator.isDeterministic(joinNode.getFilter().orElse(TRUE_CONSTANT))).capturedAs(JOIN)));
-        }
-
-        @Override
-        public boolean isEnabled(Session session)
-        {
-            return isEnabledForTesting || isInnerJoinPushdownEnabled(session);
         }
 
         @Override
@@ -374,7 +367,8 @@ public class GroupInnerJoinsByConnectorRuleSet
         }
     }
 
-    public abstract static class BaseGroupInnerJoinsByConnector
+    public abstract static class BaseGroupInnerJoinsByConnector<T>
+            implements Rule<T>
     {
         final FunctionResolution functionResolution;
         final DeterminismEvaluator determinismEvaluator;
@@ -393,39 +387,16 @@ public class GroupInnerJoinsByConnectorRuleSet
             this.nullabilityAnalyzer = new NullabilityAnalyzer(functionAndTypeManager);
         }
 
+        @Override
+        public boolean isEnabled(Session session)
+        {
+            return isEnabledForTesting || isInnerJoinPushdownEnabled(session);
+        }
+
         public void setEnabledForTesting(boolean isSet)
         {
             isEnabledForTesting = isSet;
         }
-
-        //    private static class Rewriter
-        //            extends SimplePlanRewriter<Void>
-        //    {
-        //        private final FunctionResolution functionResolution;
-        //        private final DeterminismEvaluator determinismEvaluator;
-        //        private final NullabilityAnalyzer nullabilityAnalyzer;
-        //        private final PlanNodeIdAllocator idAllocator;
-        //        private final Metadata metadata;
-        //        private final LogicalRowExpressions logicalRowExpressions;
-        //        private final Session session;
-        //        private final FunctionAndTypeManager functionAndTypeManager;
-        //        private final Lookup lookup;
-        //
-        //        private Rewriter(FunctionResolution functionResolution, DeterminismEvaluator determinismEvaluator, PlanNodeIdAllocator idAllocator, Metadata metadata, Session session, Lookup lookup)
-        //        {
-        //            this.functionResolution = requireNonNull(functionResolution, "functionResolution is null");
-        //            this.determinismEvaluator = requireNonNull(determinismEvaluator, "determinismEvaluator is null");
-        //            this.idAllocator = requireNonNull(idAllocator, "idAllocator is null");
-        //            this.metadata = requireNonNull(metadata, "metadata is null");
-        //            this.functionAndTypeManager = metadata.getFunctionAndTypeManager();
-        //            this.logicalRowExpressions = new LogicalRowExpressions(
-        //                    determinismEvaluator,
-        //                    functionResolution,
-        //                    functionAndTypeManager);
-        //            this.nullabilityAnalyzer = new NullabilityAnalyzer(functionAndTypeManager);
-        //            this.session = requireNonNull(session, "session is null");
-        //            this.lookup = requireNonNull(lookup, "lookup is null");
-        //        }
 
         private static List<RowExpression> getExpressionsWithinVariableScope(Set<RowExpression> rowExpressions, Set<VariableReferenceExpression> variableScope)
         {
