@@ -114,11 +114,12 @@ import static java.util.Objects.requireNonNull;
  * <p>
  * After Transformation:
  * --OutputNode
- * `-- TableScanNode (with all the details of the three TableScanNodes)
- * `-- Set<ConnectorTableHandle> (ConnectorHandleSet)
- * `-- TableHandle1
- * `-- TableHandle2
- * `-- TableHandle3
+ * `--FilterNode(pulled up equi-join clause + join filters)
+ *  `-- TableScanNode (with all the details of the three TableScanNodes)
+ *  `-- Set<ConnectorTableHandle> (ConnectorHandleSet)
+ *     `-- TableHandle1
+ *     `-- TableHandle2
+ *     `-- TableHandle3
  * <p>
  * Example 2:
  * Before Transformation:
@@ -139,7 +140,8 @@ import static java.util.Objects.requireNonNull;
  * <p>
  * After Transformation:
  * --OutputNode
- * `-- InnerJoin
+ * `--FilterNode(pulled up equi-join clause + join filters)
+ *  `-- CrossJoin
  *      |-- TableScanNode (with all the details of the three TableScanNodes)
  *      |   `-- Set<ConnectorTableHandle> (ConnectorHandleSet)
  *      |       |-- TableHandle1
@@ -389,12 +391,10 @@ public class GroupInnerJoinsByConnectorRuleSet
             Map<String, List<PlanNode>> sourcesByConnector = new HashMap<>();
             final boolean isInEqualityPushDownEnabled = session.getSystemProperty(INEQUALITY_JOIN_PUSHDOWN_ENABLED, Boolean.class);
 
-             /*
-              Here the join push down is happening based on  multiJoinNode.getJoinFilter() criteria.
-              JoinQueries that Inference presto to remove join criteria are not able to  push down.
-              Join push down should happen only for the tables which have valid join criteria in Presto flow [presto PlanNode]
-              For all join where no join criteria is treated as cross join, detailed discussion is available here https://github.ibm.com/lakehouse/tracker/issues/16482
-             */
+//          Here the join push down is happening based on  multiJoinNode.getJoinFilter() criteria.
+//          JoinQueries that Inference presto to remove join criteria are not able to  push down.
+//          Join push down should happen only for the tables which have valid join criteria in Presto flow [presto PlanNode]
+//          For all join where no join criteria is treated as cross join, detailed discussion is available here https://github.ibm.com/lakehouse/tracker/issues/16482
 
             EqualityInference filterEqualityInference = new EqualityInference.Builder(metadata)
                     .addEqualityInference(multiJoinNode.getJoinFilter().get())
