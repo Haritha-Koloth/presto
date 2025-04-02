@@ -97,6 +97,7 @@ import static java.util.Objects.requireNonNull;
  * This optimizer attempts to group TableScanNode's of an inner-join graph that belong to the same connector
  * This allows those connectors that can participate in join pushdown, to rewrite these sources to a new TableScanNode that represents the result of the pushed down join
  * This re-written join graph has filter's pulled up, so filters need to be re pushed down again with the PredicatePushdown rule
+ * This optimizer checks filter determinism before applying query optimizations, as non-deterministic filters can hinder filter pushdown leading to inconsistent results.
  * <p>
  * Example 1:
  * Before Transformation:
