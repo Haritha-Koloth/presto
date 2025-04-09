@@ -39,4 +39,3 @@ public interface ConnectorPlanOptimizerProvider
         return Collections.emptySet();
     }
 }
-

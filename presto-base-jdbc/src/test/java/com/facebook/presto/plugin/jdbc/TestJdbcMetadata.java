@@ -216,7 +216,7 @@ public class TestJdbcMetadata
     {
         assertEquals(
                 metadata.getColumnMetadata(SESSION, tableHandle, new JdbcColumnHandle(CONNECTOR_ID, "text", JDBC_VARCHAR, VARCHAR, true, Optional.empty(), Optional.empty())),
-                new ColumnMetadata("text", VARCHAR));
+                ColumnMetadata.builder().setName("text").setType(VARCHAR).build());
     }
 
     @Test
