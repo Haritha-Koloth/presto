@@ -49,6 +49,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -212,7 +213,7 @@ public class BaseJdbcClient
                             resultSet.getString("TABLE_CAT"),
                             resultSet.getString("TABLE_SCHEM"),
                             resultSet.getString("TABLE_NAME"),
-                            Optional.empty(),
+                            Collections.emptyList(),
                             Optional.empty()));
                 }
                 if (tableHandles.isEmpty()) {
@@ -317,7 +318,6 @@ public class BaseJdbcClient
                 split.getTableName(),
                 split.getJoinTables(),
                 columnHandles,
-                ImmutableMap.of(),
                 split.getTupleDomain(),
                 split.getAdditionalPredicate());
     }
@@ -583,7 +583,7 @@ public class BaseJdbcClient
                 handle.getCatalogName(),
                 handle.getSchemaName(),
                 handle.getTemporaryTableName(),
-                Optional.empty(),
+                Collections.emptyList(),
                 Optional.empty()));
     }
 
