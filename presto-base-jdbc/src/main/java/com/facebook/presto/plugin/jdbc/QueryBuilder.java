@@ -13,7 +13,6 @@
  */
 package com.facebook.presto.plugin.jdbc;
 
-import com.facebook.airlift.log.Logger;
 import com.facebook.presto.common.predicate.Domain;
 import com.facebook.presto.common.predicate.Range;
 import com.facebook.presto.common.predicate.TupleDomain;
@@ -68,8 +67,6 @@ import static org.joda.time.DateTimeZone.UTC;
 
 public class QueryBuilder
 {
-    private static final Logger log = Logger.get(QueryBuilder.class);
-
     // not all databases support booleans, so use 1=1 and 1=0 instead
     private static final String ALWAYS_TRUE = "1=1";
     private static final String ALWAYS_FALSE = "1=0";
@@ -110,30 +107,49 @@ public class QueryBuilder
             String catalog,
             String schema,
             String table,
-            Optional<List<ConnectorTableHandle>> joinPushdownTables,
+            List<ConnectorTableHandle> joinPushdownTables,
             List<JdbcColumnHandle> columns,
-            Map<String, String> columnExpressions,
             TupleDomain<ColumnHandle> tupleDomain,
             Optional<JdbcExpression> additionalPredicate)
             throws SQLException
     {
         boolean joinPushdownEnabled = checkIfJoinQuery(joinPushdownTables);
-        if (joinPushdownEnabled) {
-            return buildJoinSql(client, session, connection, joinPushdownTables.get(), columns, tupleDomain, additionalPredicate, true);
-        }
         StringBuilder sql = new StringBuilder();
+        List<TypeAndValue> accumulator = new ArrayList<>();
+        List<String> clauses = new ArrayList<>();
 
+        if (joinPushdownEnabled) {
+            return buildJoinSql(client, session, connection, joinPushdownTables, columns, tupleDomain, additionalPredicate, true);
+        }
+
+        buildSelectClause(columns, sql);
+        buildFromClause(catalog, schema, table, sql);
+
+        clauses = toConjuncts(columns, tupleDomain, accumulator, false);
+        clauses = buildClauses(additionalPredicate, accumulator, clauses);
+
+        buildWhereClause(clauses, sql);
+
+        sql.append(String.format("/* %s : %s */", session.getUser(), session.getQueryId()));
+        PreparedStatement statement = client.getPreparedStatement(session, connection, sql.toString());
+        bindParams(accumulator, statement);
+
+        return statement;
+    }
+
+    private void buildSelectClause(List<JdbcColumnHandle> columns, StringBuilder sql)
+    {
         String columnNames = columns.stream()
                 .map(JdbcColumnHandle::getColumnName)
                 .map(this::quote)
                 .collect(joining(", "));
 
         sql.append("SELECT ");
-        sql.append(columnNames);
-        if (columns.isEmpty()) {
-            sql.append("null");
-        }
+        sql.append(columnNames.isEmpty() ? "null" : columnNames);
+    }
 
+    private void buildFromClause(String catalog, String schema, String table, StringBuilder sql)
+    {
         sql.append(" FROM ");
         if (!isNullOrEmpty(catalog)) {
             sql.append(quote(catalog)).append('.');
@@ -142,83 +158,14 @@ public class QueryBuilder
             sql.append(quote(schema)).append('.');
         }
         sql.append(quote(table));
-
-        List<TypeAndValue> accumulator = new ArrayList<>();
-
-        List<String> clauses = toConjuncts(columns, tupleDomain, accumulator, false);
-        if (additionalPredicate.isPresent()) {
-            clauses = ImmutableList.<String>builder()
-                    .addAll(clauses)
-                    .add(additionalPredicate.get().getExpression())
-                    .build();
-            accumulator.addAll(additionalPredicate.get().getBoundConstantValues().stream()
-                    .map(constantExpression -> new TypeAndValue(constantExpression.getType(), constantExpression.getValue()))
-                    .collect(ImmutableList.toImmutableList()));
-        }
-        if (!clauses.isEmpty()) {
-            sql.append(" WHERE ")
-                    .append(Joiner.on(" AND ").join(clauses));
-        }
-        sql.append(String.format("/* %s : %s */", session.getUser(), session.getQueryId()));
-        PreparedStatement statement = client.getPreparedStatement(session, connection, sql.toString());
-
-        for (int i = 0; i < accumulator.size(); i++) {
-            TypeAndValue typeAndValue = accumulator.get(i);
-            if (typeAndValue.getType().equals(BigintType.BIGINT)) {
-                statement.setLong(i + 1, (long) typeAndValue.getValue());
-            }
-            else if (typeAndValue.getType().equals(IntegerType.INTEGER)) {
-                statement.setInt(i + 1, ((Number) typeAndValue.getValue()).intValue());
-            }
-            else if (typeAndValue.getType().equals(SmallintType.SMALLINT)) {
-                statement.setShort(i + 1, ((Number) typeAndValue.getValue()).shortValue());
-            }
-            else if (typeAndValue.getType().equals(TinyintType.TINYINT)) {
-                statement.setByte(i + 1, ((Number) typeAndValue.getValue()).byteValue());
-            }
-            else if (typeAndValue.getType().equals(DoubleType.DOUBLE)) {
-                statement.setDouble(i + 1, (double) typeAndValue.getValue());
-            }
-            else if (typeAndValue.getType().equals(RealType.REAL)) {
-                statement.setFloat(i + 1, intBitsToFloat(((Number) typeAndValue.getValue()).intValue()));
-            }
-            else if (typeAndValue.getType().equals(BooleanType.BOOLEAN)) {
-                statement.setBoolean(i + 1, (boolean) typeAndValue.getValue());
-            }
-            else if (typeAndValue.getType().equals(DateType.DATE)) {
-                long millis = DAYS.toMillis((long) typeAndValue.getValue());
-                statement.setDate(i + 1, new Date(UTC.getMillisKeepLocal(DateTimeZone.getDefault(), millis)));
-            }
-            else if (typeAndValue.getType().equals(TimeType.TIME)) {
-                statement.setTime(i + 1, new Time((long) typeAndValue.getValue()));
-            }
-            else if (typeAndValue.getType().equals(TimeWithTimeZoneType.TIME_WITH_TIME_ZONE)) {
-                statement.setTime(i + 1, new Time(unpackMillisUtc((long) typeAndValue.getValue())));
-            }
-            else if (typeAndValue.getType().equals(TimestampType.TIMESTAMP)) {
-                statement.setTimestamp(i + 1, new Timestamp((long) typeAndValue.getValue()));
-            }
-            else if (typeAndValue.getType().equals(TimestampWithTimeZoneType.TIMESTAMP_WITH_TIME_ZONE)) {
-                statement.setTimestamp(i + 1, new Timestamp(unpackMillisUtc((long) typeAndValue.getValue())));
-            }
-            else if (typeAndValue.getType() instanceof VarcharType) {
-                statement.setString(i + 1, ((Slice) typeAndValue.getValue()).toStringUtf8());
-            }
-            else if (typeAndValue.getType() instanceof CharType) {
-                statement.setString(i + 1, ((Slice) typeAndValue.getValue()).toStringUtf8());
-            }
-            else {
-                throw new UnsupportedOperationException("Can't handle type: " + typeAndValue.getType());
-            }
-        }
-        log.debug("Query is not Pushed down ");
-        log.debug("Actual Query :: ", sql.toString());
-        return statement;
     }
 
-    private boolean checkIfJoinQuery(Optional<List<ConnectorTableHandle>> joinPushdownTables)
+    private void buildWhereClause(List<String> clauses, StringBuilder sql)
     {
-        return (joinPushdownTables != null && joinPushdownTables.isPresent() && !joinPushdownTables.get().isEmpty());
+        if (!clauses.isEmpty()) {
+            sql.append(" WHERE ")
+                    .append(String.join(" AND ", clauses));
+        }
     }
 
     private PreparedStatement buildJoinSql(
@@ -234,17 +181,36 @@ public class QueryBuilder
     {
         StringBuilder sql = new StringBuilder();
         Map<String, String> tableReferencesAndTableAliases = new HashMap<>();
-
         List<String> selectColumns = getSelectColumns(columns);
-        setTableReferences(joinTables, tableReferencesAndTableAliases);
 
         sql.append(getJoinProjection(selectColumns));
+
+        // Set table references (aliases and table names)
+        setTableReferences(joinTables, tableReferencesAndTableAliases, joinPushdownEnabled);
         sql.append(getTableReferences(tableReferencesAndTableAliases));
 
+        // Get the WHERE clauses (with conditions from tupleDomain and columns)
         List<TypeAndValue> accumulator = new ArrayList<>();
-
         List<String> clauses = toConjuncts(columns, tupleDomain, accumulator, joinPushdownEnabled);
 
+        clauses = buildClauses(additionalPredicate, accumulator, clauses);
+        buildWhereClause(clauses, sql);
+
+        sql.append(String.format("/* %s : %s */", session.getUser(), session.getQueryId()));
+
+        PreparedStatement statement = client.getPreparedStatement(session, connection, sql.toString());
+        bindParams(accumulator, statement);
+
+        return statement;
+    }
+
+    private boolean checkIfJoinQuery(List<ConnectorTableHandle> joinPushdownTables)
+    {
+        return (joinPushdownTables != null && !joinPushdownTables.isEmpty());
+    }
+
+    private static List<String> buildClauses(Optional<JdbcExpression> additionalPredicate, List<TypeAndValue> accumulator, List<String> clauses)
+    {
         if (additionalPredicate.isPresent()) {
             clauses = ImmutableList.<String>builder()
                     .addAll(clauses)
@@ -255,14 +221,11 @@ public class QueryBuilder
                     .map(constantExpression -> new TypeAndValue(constantExpression.getType(), constantExpression.getValue()))
                     .collect(ImmutableList.toImmutableList()));
         }
-        if (!clauses.isEmpty()) {
-            sql.append(" WHERE ");
-            sql.append(String.join(" AND ", clauses));
-        }
-        sql.append(String.format("/* %s : %s */", session.getUser(), session.getQueryId()));
+        return clauses;
+    }
 
-        PreparedStatement statement = client.getPreparedStatement(session, connection, sql.toString());
-
+    private static void bindParams(List<TypeAndValue> accumulator, PreparedStatement statement) throws SQLException
+    {
         for (int i = 0; i < accumulator.size(); i++) {
             TypeAndValue typeAndValue = accumulator.get(i);
             if (typeAndValue.getType().equals(BigintType.BIGINT)) {
@@ -312,9 +275,6 @@ public class QueryBuilder
                 throw new UnsupportedOperationException("Can't handle type: " + typeAndValue.getType());
             }
         }
-        log.debug("Query is Pushed down");
-        log.debug("Join Query :: ", sql.toString());
-        return statement;
     }
 
     private static boolean isAcceptedType(Type type)
@@ -466,7 +426,7 @@ public class QueryBuilder
         return columnTableAlias.map(s -> quote(s) + "." + quote(columnName)).orElseGet(() -> quote(columnName));
     }
 
-    private void setTableReferences(List<ConnectorTableHandle> joinTables, Map<String, String> tableReferencesAndTableAliases)
+    private void setTableReferences(List<ConnectorTableHandle> joinTables, Map<String, String> tableReferencesAndTableAliases, boolean joinPushdownEnabled)
     {
         for (ConnectorTableHandle table : joinTables) {
             JdbcTableHandle tableHandle = (JdbcTableHandle) table;
@@ -478,7 +438,7 @@ public class QueryBuilder
             String tableName = tableHandle.getTableName();
             Optional<String> tableAlias = tableHandle.getTableAlias();
             String schemaTableName = quote(schemaName) + "." + quote(tableName);
-            if (tableAlias.isPresent()) {
+            if (joinPushdownEnabled && tableAlias.isPresent()) {
                 String alias = tableAlias.get();
                 tableReferencesAndTableAliases.put(quote(alias), schemaTableName);
             }
